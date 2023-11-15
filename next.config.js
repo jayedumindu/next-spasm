@@ -2,10 +2,8 @@
 var path = require("path");
 const nextConfig = {
   reactStrictMode: false,
-  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-    config.resolve.alias["__dirname"] = path.resolve("~");
-    return config;
-  },
+  distDir: "out",
+  output: "export",
 };
 
 module.exports = nextConfig;
