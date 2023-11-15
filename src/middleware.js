@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { withAuth } from "next-auth/middleware";
 
 export const middleware = async (request) => {
   const path = request.nextUrl.pathname;
@@ -21,6 +20,6 @@ export const middleware = async (request) => {
 };
 
 // See "Matching Paths" below to learn more
-export const config = withAuth({
+export const config = {
   matcher: ["/", "/login", "/signup", "/verifymail"],
-});
+};
