@@ -4,9 +4,6 @@ export const middleware = async (request) => {
   const path = request.nextUrl.pathname;
   const token = request.cookies.get("token")?.value || "";
 
-  console.log(path);
-  console.log("token", token);
-
   const isPublicPath =
     path === "/login" || path === "/signup" || path === "/verifymail";
 
