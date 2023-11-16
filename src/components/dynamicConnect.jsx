@@ -212,21 +212,21 @@ function DynamicConnect() {
         <Row justify="center">
           <Col span={24} className="p-5">
             <Flex wrap="nowrap" gap="large" justify="center">
-              <Tooltip title={!audio ? "mute" : "unmute"}>
+              <Tooltip title={audio ? "mute" : "unmute"}>
                 <Button
                   type="primary"
                   shape="circle"
-                  icon={!audio ? <AudioOutlined /> : <AudioMutedOutlined />}
+                  icon={audio ? <AudioOutlined /> : <AudioMutedOutlined />}
                   size="large"
                   onClick={toggleAudio}
                 />
               </Tooltip>
-              <Tooltip title={!video ? "pause camera" : "resume"}>
+              <Tooltip title={video ? "pause camera" : "resume"}>
                 <Button
                   size="large"
                   shape="circle"
                   type="primary"
-                  icon={!video ? <CameraOutlined /> : <CloseOutlined />}
+                  icon={video ? <CameraOutlined /> : <CloseOutlined />}
                   onClick={toggleVideo}
                 />
               </Tooltip>
