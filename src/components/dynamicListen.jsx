@@ -60,15 +60,13 @@ function DynamicListen() {
       conn.on("data", function (data) {
         // Will print 'hi!'
         console.log(data);
+        dispatch(stopSpin());
       });
     });
 
     myPeer.on("call", function (call) {
       console.log("call ekak awa");
       dispatch(makeSpin());
-
-      // if both are present
-
       if (videoStream) {
         call.answer(videoStream);
         call.on("stream", (remoteStream) => {
@@ -93,10 +91,6 @@ function DynamicListen() {
       dispatch(stopSpin());
     });
   };
-
-  useEffect(() => {
-    peerId ? dispatch(stopSpin()) : dispatch(makeSpin());
-  }, [peerId]);
 
   const verify = async () => {
     dispatch(makeSpin());
@@ -148,9 +142,10 @@ function DynamicListen() {
   };
 
   useEffect(() => {
+    dispatch(makeSpin());
     const initialize = async () => {
       await verify();
-      connectToServer();
+      await connectToServer();
     };
     initialize();
   }, []);

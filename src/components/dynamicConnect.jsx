@@ -114,8 +114,6 @@ function DynamicConnect() {
     }
   };
 
-  useEffect(() => {}, [peerId]);
-
   const verify = async () => {
     dispatch(makeSpin());
     try {
@@ -156,9 +154,10 @@ function DynamicConnect() {
   };
 
   useEffect(() => {
+    dispatch(makeSpin());
     const initialize = async () => {
       await verify();
-      connectToHost();
+      await connectToHost();
     };
 
     initialize();
