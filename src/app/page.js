@@ -123,8 +123,6 @@ const HomePage = () => {
     } catch (error) {
       console.log(error);
       messageApi.error("failed!");
-    } finally {
-      setTimeout(() => dispatch(stopSpin()), 1000);
     }
   };
 
@@ -138,7 +136,7 @@ const HomePage = () => {
       <Template>
         {contextHolder}
         <CustomHeader items={navItemsHidden} keys={[1]} />
-        <Title className="text-center p-5">{`Welcome to Omeagle!`}</Title>
+        <Title className="text-center p-5">{`Welcome to SPASM 😛`}</Title>
         <Row justify="center">
           <Col>
             <Form name="listenForm" {...formItemLayout} onFinish={listen}>

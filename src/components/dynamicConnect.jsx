@@ -43,92 +43,104 @@ function DynamicConnect() {
   const [videoStream, setvideoStream] = useState(null);
   const [remoteStream, setRemote] = useState(null);
   const [call, setCall] = useState(null);
+  const [peer, setPeer] = useState(null);
   const hostId = params.get("host");
 
   const connectToHost = async () => {
     if (hostId) {
-      const myPeer = new Peer(undefined, {
-        host: "spasm-peer-server.onrender.com",
-        path: "/connect",
-        port: "443",
-        secure: true,
-      });
+      try {
+        const myPeer = new Peer(undefined, {
+          host: "spasm-peer-server.onrender.com",
+          path: "/connect",
+          port: "443",
+          secure: true,
+        });
 
-      myPeer.on("open", async function (id) {
-        console.log("connection opened : " + id);
-        setPeerId(id);
-        try {
-          myPeer.connect(hostId);
-          let videoStream = await startWebcam();
-          const call = myPeer.call(hostId, videoStream);
-          setCall(call);
-          if (call) {
-            call.on("stream", (remoteStream) => {
-              setRemote(remoteStream);
-              const videoElement = document.getElementById("remoteStream");
-              videoElement.srcObject = remoteStream;
-              videoElement.muted = false;
-              videoElement.autoplay = true;
-              videoElement.playsInline = true;
-            });
-            call.on("close", (remoteStream) => {
-              messageApi.info("user disconnected!");
-              dispatch(makeSpin());
-              router.push("/");
-              setTimeout(() => {
-                dispatch(stopSpin);
-              }, 2000);
-            });
-          } else {
-            messageApi.error("unable to connect to host!");
+        setPeer(myPeer);
+
+        let videoStream = await startWebcam();
+
+        myPeer.on("open", function (id) {
+          console.log("connection opened : " + id);
+          setPeerId(id);
+          try {
+            const call = myPeer.call(hostId, videoStream);
+            console.log(call);
+            setCall(call);
+            if (call) {
+              call.on("stream", (remoteStream) => {
+                dispatch(stopSpin());
+                setRemote(remoteStream);
+                const videoElement = document.getElementById("remoteStream");
+                videoElement.srcObject = remoteStream;
+                videoElement.muted = false;
+                videoElement.autoplay = true;
+                videoElement.playsInline = true;
+              });
+              call.on("close", (remoteStream) => {
+                messageApi.info("user disconnected!");
+                dispatch(makeSpin());
+                router.push("/");
+                setTimeout(() => {
+                  dispatch(stopSpin);
+                }, 2000);
+              });
+            } else {
+              messageApi.error("unable to connect to host!");
+            }
+          } catch (error) {
+            messageApi.error("connection failed!");
           }
-        } catch (error) {
-          messageApi.error("connection failed!");
-        }
-      });
-
-      myPeer.on("connection", function (conn) {
-        conn.on("data", function (data) {
-          // Will print 'hi!'
-          console.log(data);
         });
-      });
 
-      myPeer.on("call", function (call) {
-        console.log("call ekak awa");
-        // if both are present
-        setCall(call);
-        if (videoStream) {
-          call.answer(videoStream);
-        } else {
-          console.log("video stream cannot be found!");
-        }
-        call.on("close", () => {
-          messageApi.info("user disconnected!");
-          setRemote(null);
-          setCall(null);
+        myPeer.on("connection", function (conn) {
+          conn.on("data", function (data) {
+            // Will print 'hi!'
+            console.log(data);
+          });
         });
-      });
+
+        myPeer.on("call", function (call) {
+          console.log("call ekak awa");
+          // if both are present
+          if (videoStream) {
+            call.answer(videoStream);
+          } else {
+            console.log("video stream cannot be found!");
+          }
+          call.on("close", () => {
+            messageApi.info("user disconnected!");
+            setRemote(null);
+            setCall(null);
+          });
+        });
+      } catch (error) {
+        console.log(error);
+        messageApi.error("something wrong happened!!");
+      }
     } else {
       messageApi.error("host not found!");
     }
   };
 
+  // Stop the camera stream
+  const stopCamera = () => {
+    videoStream.getTracks().forEach(function (track) {
+      track.stop();
+    });
+  };
+
   const verify = async () => {
-    dispatch(makeSpin());
     try {
       await axios.get("api/user/verify/");
     } catch (error) {
       console.log(error);
       messageApi.error("verification failed!");
-    } finally {
-      setTimeout(() => dispatch(stopSpin()), 1000);
     }
   };
 
   const startWebcam = async () => {
     if (typeof window !== "undefined") {
-      dispatch(makeSpin());
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -147,15 +159,14 @@ function DynamicConnect() {
         return stream;
       } catch (error) {
         console.error("Error accessing webcam:", error.message);
-      } finally {
-        setTimeout(() => dispatch(stopSpin()), 1000);
       }
     }
   };
 
   useEffect(() => {
-    dispatch(makeSpin());
     const initialize = async () => {
+      dispatch(makeSpin());
+      messageApi.info("If it keeps spinning refresh the page!");
       await verify();
       await connectToHost();
     };
@@ -176,10 +187,12 @@ function DynamicConnect() {
   };
 
   const endCall = () => {
+    stopCamera();
     if (call) {
       call.close();
-      router.push("/");
     }
+    peer.disconnect();
+    router.push("/");
   };
 
   return (
@@ -205,7 +218,11 @@ function DynamicConnect() {
             className={remoteStream ? "block" : "hidden"}
           >
             <div className="shadow-none rounded-md">
-              <video muted id="remoteStream" className="w-full" />
+              <video
+                muted
+                id="remoteStream"
+                className="w-full h-full rounded-md"
+              />
             </div>
           </Col>
         </Row>

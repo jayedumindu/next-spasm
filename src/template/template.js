@@ -2,7 +2,7 @@ import { Layout, Spin } from "antd";
 import { useSelector } from "react-redux";
 import CustomFooter from "@/components/footer";
 import CustomContent from "@/components/content";
-import { LoadingOutlined } from "@ant-design/icons";
+import { Loading3QuartersOutlined, LoadingOutlined } from "@ant-design/icons";
 
 const Template = ({ children, selectedKeys }) => {
   let styles = {
@@ -16,18 +16,24 @@ const Template = ({ children, selectedKeys }) => {
     spinner: {
       backgroundColor: "white",
     },
+    indicator: {
+      fontSize: 40,
+    },
   };
 
-  const spinning = useSelector((state) => state.loading);
+  const loading = useSelector((state) => state.loading);
+  const tip = useSelector((state) => state.tip);
 
   return (
     <Layout style={styles.layout}>
       <Spin
-        fullscreen
-        spinning={spinning}
+        size="large"
+        indicator={<LoadingOutlined style={styles.indicator} />}
+        spinning={loading}
         style={styles.spinner}
-        indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />}
+        fullscreen
       />
+
       <CustomContent styles={styles.content}>{children}</CustomContent>
       <CustomFooter styles={styles.footer} />
     </Layout>

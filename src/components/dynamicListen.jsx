@@ -15,7 +15,7 @@ import theme from "@/app/theme";
 import Template from "@/template/template";
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { makeSpin, stopSpin } from "@/redux/features/auth";
+import { makeSpin, stopSpin, setSpinnerTip } from "@/redux/features/auth";
 import { useDispatch } from "react-redux";
 import Peer from "peerjs";
 import {
@@ -39,6 +39,8 @@ function DynamicListen() {
   const [call, setCall] = useState(null);
   const [audio, setAudio] = useState(true);
   const [video, setVideo] = useState(true);
+  const [connection, setConnection] = useState(null);
+  const [peer, setPeer] = useState(null);
   const [videoStream, setvideoStream] = useState(null);
 
   const connectToServer = async function () {
@@ -49,19 +51,14 @@ function DynamicListen() {
       secure: true,
     });
 
+    setPeer(myPeer);
+
     let videoStream = await startWebcam();
+    setvideoStream(videoStream);
 
     myPeer.on("open", function (id) {
       console.log("connection opened : " + id);
       setPeerId(id);
-    });
-
-    myPeer.on("connection", function (conn) {
-      conn.on("data", function (data) {
-        // Will print 'hi!'
-        console.log(data);
-        dispatch(stopSpin());
-      });
     });
 
     myPeer.on("call", function (call) {
@@ -78,6 +75,7 @@ function DynamicListen() {
           videoElement.muted = false;
           videoElement.autoplay = true;
           videoElement.playsInline = true;
+          dispatch(stopSpin());
         });
       } else {
         console.log("video stream cannot be found!");
@@ -88,25 +86,33 @@ function DynamicListen() {
         setRemote(null);
         setCall(null);
       });
-      dispatch(stopSpin());
+    });
+
+    myPeer.on("connection", function (conn) {
+      conn.on("data", function (data) {
+        // Will print 'hi!'
+        console.log(data);
+      });
     });
   };
 
+  useEffect(() => {
+    if (peerId) {
+      setTimeout(() => dispatch(stopSpin()), 1000);
+    }
+  }, [peerId]);
+
   const verify = async () => {
-    dispatch(makeSpin());
     try {
       await axios.get("api/user/verify/");
     } catch (error) {
       console.log(error);
       messageApi.error("verification failed!");
-    } finally {
-      setTimeout(() => dispatch(stopSpin()), 1000);
     }
   };
 
   const startWebcam = async () => {
     if (typeof window !== "undefined") {
-      dispatch(makeSpin());
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -118,14 +124,11 @@ function DynamicListen() {
         videoElement.muted = true;
         videoElement.autoplay = true;
         videoElement.playsInline = true;
-        setvideoStream(stream);
 
         console.log("Webcam started and attached to the video element.");
         return stream;
       } catch (error) {
         console.error("Error accessing webcam:", error.message);
-      } finally {
-        setTimeout(() => dispatch(stopSpin()), 1000);
       }
     }
   };
@@ -142,8 +145,10 @@ function DynamicListen() {
   };
 
   useEffect(() => {
-    dispatch(makeSpin());
     const initialize = async () => {
+      dispatch(makeSpin());
+      messageApi.info("If it keeps spinning refresh the page!");
+
       await verify();
       await connectToServer();
     };
@@ -162,9 +167,20 @@ function DynamicListen() {
     setAudio((audio) => !audio);
   };
 
+  // Stop the camera stream
+  const stopCamera = () => {
+    videoStream.getTracks().forEach(function (track) {
+      track.stop();
+    });
+  };
+
   const endCall = () => {
     if (call) {
       call.close();
+    } else {
+      stopCamera();
+      peer.disconnect();
+      router.push("/");
     }
   };
 
@@ -191,7 +207,11 @@ function DynamicListen() {
             className={remoteStream ? "block" : "hidden"}
           >
             <div className="shadow-none rounded-md">
-              <video muted id="remoteStream" className="w-full" />
+              <video
+                muted
+                id="remoteStream"
+                className="w-full h-full rounded-md"
+              />
             </div>
           </Col>
         </Row>

@@ -4,6 +4,7 @@ import React from "react";
 function NotFound() {
   return (
     <Result
+      style={{ backgroundColor: "white", minHeight: "100vh" }}
       status="404"
       title="404"
       subTitle="Sorry, the page you visited does not exist."
