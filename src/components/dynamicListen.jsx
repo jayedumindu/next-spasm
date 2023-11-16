@@ -19,18 +19,26 @@ import { makeSpin, stopSpin } from "@/redux/features/auth";
 import { useDispatch } from "react-redux";
 import Peer from "peerjs";
 import {
+  AudioMutedOutlined,
   AudioOutlined,
   CameraOutlined,
+  CloseOutlined,
   CopyFilled,
   PoweroffOutlined,
 } from "@ant-design/icons";
+import { useRouter } from "next/navigation";
 
 const { Title } = Typography;
 
 function DynamicListen() {
   const [messageApi, contextHolder] = message.useMessage();
+  const router = useRouter();
   const dispatch = useDispatch();
   const [peerId, setPeerId] = useState(null);
+  const [remoteStream, setRemote] = useState(null);
+  const [call, setCall] = useState(null);
+  const [audio, setAudio] = useState(true);
+  const [video, setVideo] = useState(true);
   const [videoStream, setvideoStream] = useState(null);
 
   const connectToServer = async function () {
@@ -42,7 +50,6 @@ function DynamicListen() {
     });
 
     let videoStream = await startWebcam();
-    console.log("video", videoStream);
 
     myPeer.on("open", function (id) {
       console.log("connection opened : " + id);
@@ -58,12 +65,16 @@ function DynamicListen() {
 
     myPeer.on("call", function (call) {
       console.log("call ekak awa");
+      dispatch(makeSpin());
+
       // if both are present
 
       if (videoStream) {
         call.answer(videoStream);
         call.on("stream", (remoteStream) => {
           console.log("streaming is happening!!!!");
+          setRemote(remoteStream);
+          setCall(call);
           const videoElement = document.getElementById("remoteStream");
           videoElement.srcObject = remoteStream;
           videoElement.muted = false;
@@ -72,9 +83,20 @@ function DynamicListen() {
         });
       } else {
         console.log("video stream cannot be found!");
+        messageApi.error("failed!");
       }
+      call.on("close", () => {
+        messageApi.info("user disconnected!");
+        setRemote(null);
+        setCall(null);
+      });
+      dispatch(stopSpin());
     });
   };
+
+  useEffect(() => {
+    peerId ? dispatch(stopSpin()) : dispatch(makeSpin());
+  }, [peerId]);
 
   const verify = async () => {
     dispatch(makeSpin());
@@ -102,6 +124,7 @@ function DynamicListen() {
         videoElement.muted = true;
         videoElement.autoplay = true;
         videoElement.playsInline = true;
+        setvideoStream(stream);
 
         console.log("Webcam started and attached to the video element.");
         return stream;
@@ -132,57 +155,70 @@ function DynamicListen() {
     initialize();
   }, []);
 
+  const toggleVideo = () => {
+    videoStream.getVideoTracks()[0].enabled =
+      !videoStream.getVideoTracks()[0].enabled;
+    setVideo((video) => !video);
+  };
+
+  const toggleAudio = () => {
+    videoStream.getAudioTracks()[0].enabled =
+      !videoStream.getAudioTracks()[0].enabled;
+    setAudio((audio) => !audio);
+  };
+
+  const endCall = () => {
+    if (call) {
+      call.close();
+    }
+  };
+
   return (
     <ConfigProvider theme={theme}>
       <Template>
         {contextHolder}
-        {/* <CustomHeader items={navItemsHidden} keys={[1]} /> */}
         <div className="text-center">
-          <Title className="p-2">{`Listening!`}</Title>
-          <div className="flex flex-nowrap justify-center items-center p-5">
-            <Title level={5} className="p-2" style={{ margin: 0 }} id="peerId">
-              {peerId ? peerId : "loading"}
-            </Title>
-            <Tooltip title="copy to clipboard">
-              <Button
-                size="medium"
-                shape="circle"
-                icon={<CopyFilled />}
-                onClick={copyToClipboard}
-              />
-            </Tooltip>
-          </div>
+          <Title className="p-1">
+            {call ? `Connected 🥳` : "Streaming 😴"}
+          </Title>
         </div>
-
-        <Row justify="center">
-          <Col span={12}>
-            <Card style={{ padding: 0 }}>
-              <video id="userStream" className="w-full" />
-            </Card>
+        <Row justify="space-around">
+          <Col sm={23} md={23} lg={11}>
+            <div className="shadow-none rounded-md">
+              <video id="userStream" className="w-full h-full rounded-md" />
+            </div>
           </Col>
-          <Col span={11}>
-            <Card style={{ padding: 0 }}>
-              <video id="remoteStream" className="w-full" />
-            </Card>
+
+          <Col
+            sm={23}
+            md={23}
+            lg={11}
+            className={remoteStream ? "block" : "hidden"}
+          >
+            <div className="shadow-none rounded-md">
+              <video muted id="remoteStream" className="w-full" />
+            </div>
           </Col>
         </Row>
         <Row justify="center">
-          <Col span={6} className="p-5">
+          <Col span={24} className="p-5">
             <Flex wrap="nowrap" gap="large" justify="center">
-              <Tooltip title="mute">
+              <Tooltip title={!audio ? "mute" : "unmute"}>
                 <Button
                   type="primary"
                   shape="circle"
-                  icon={<AudioOutlined />}
+                  icon={!audio ? <AudioOutlined /> : <AudioMutedOutlined />}
                   size="large"
+                  onClick={toggleAudio}
                 />
               </Tooltip>
-              <Tooltip title="pause camera">
+              <Tooltip title={!video ? "pause camera" : "resume"}>
                 <Button
                   size="large"
                   shape="circle"
                   type="primary"
-                  icon={<CameraOutlined />}
+                  icon={!video ? <CameraOutlined /> : <CloseOutlined />}
+                  onClick={toggleVideo}
                 />
               </Tooltip>
 
@@ -193,8 +229,27 @@ function DynamicListen() {
                   type="primary"
                   danger
                   icon={<PoweroffOutlined />}
+                  onClick={endCall}
                 />
               </Tooltip>
+              <div className="flex flex-nowrap justify-center items-center">
+                <Title
+                  level={5}
+                  className="p-2"
+                  id="peerId"
+                  style={{ margin: 0 }}
+                >
+                  {peerId ? peerId : "loading"}
+                </Title>
+                <Tooltip title="copy to clipboard">
+                  <Button
+                    size="medium"
+                    shape="circle"
+                    icon={<CopyFilled />}
+                    onClick={copyToClipboard}
+                  />
+                </Tooltip>
+              </div>
             </Flex>
           </Col>
         </Row>

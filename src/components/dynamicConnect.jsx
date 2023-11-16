@@ -18,12 +18,14 @@ import axios from "axios";
 import { makeSpin, stopSpin } from "@/redux/features/auth";
 import { useDispatch } from "react-redux";
 import CustomHeader from "@/components/header";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Peer from "peerjs";
 
 import {
+  AudioMutedOutlined,
   AudioOutlined,
   CameraOutlined,
+  CloseOutlined,
   CopyFilled,
   PoweroffOutlined,
 } from "@ant-design/icons";
@@ -34,8 +36,13 @@ function DynamicConnect() {
   const [messageApi, contextHolder] = message.useMessage();
   const params = useSearchParams();
   const dispatch = useDispatch();
+  const router = useRouter();
+  const [audio, setAudio] = useState(true);
+  const [video, setVideo] = useState(true);
   const [peerId, setPeerId] = useState(null);
   const [videoStream, setvideoStream] = useState(null);
+  const [remoteStream, setRemote] = useState(null);
+  const [call, setCall] = useState(null);
   const hostId = params.get("host");
 
   const connectToHost = async () => {
@@ -54,10 +61,10 @@ function DynamicConnect() {
           myPeer.connect(hostId);
           let videoStream = await startWebcam();
           const call = myPeer.call(hostId, videoStream);
-          console.log(call);
+          setCall(call);
           if (call) {
             call.on("stream", (remoteStream) => {
-              console.log("streaming is happening!!!!");
+              setRemote(remoteStream);
               const videoElement = document.getElementById("remoteStream");
               videoElement.srcObject = remoteStream;
               videoElement.muted = false;
@@ -65,10 +72,12 @@ function DynamicConnect() {
               videoElement.playsInline = true;
             });
             call.on("close", (remoteStream) => {
-              myVideo.remove();
-            });
-            call.on("disconnect", (remoteStream) => {
-              myVideo.remove();
+              messageApi.info("user disconnected!");
+              dispatch(makeSpin());
+              router.push("/");
+              setTimeout(() => {
+                dispatch(stopSpin);
+              }, 2000);
             });
           } else {
             messageApi.error("unable to connect to host!");
@@ -85,19 +94,27 @@ function DynamicConnect() {
         });
       });
 
-      myPeer.on("call", (call) => {
+      myPeer.on("call", function (call) {
         console.log("call ekak awa");
         // if both are present
+        setCall(call);
         if (videoStream) {
           call.answer(videoStream);
         } else {
           console.log("video stream cannot be found!");
         }
+        call.on("close", () => {
+          messageApi.info("user disconnected!");
+          setRemote(null);
+          setCall(null);
+        });
       });
     } else {
       messageApi.error("host not found!");
     }
   };
+
+  useEffect(() => {}, [peerId]);
 
   const verify = async () => {
     dispatch(makeSpin());
@@ -126,6 +143,7 @@ function DynamicConnect() {
         videoElement.muted = true;
         videoElement.autoplay = true;
         videoElement.playsInline = true;
+        setvideoStream(stream);
 
         console.log("Webcam started and attached to the video element.");
         return stream;
@@ -133,17 +151,6 @@ function DynamicConnect() {
         console.error("Error accessing webcam:", error.message);
       } finally {
         setTimeout(() => dispatch(stopSpin()), 1000);
-      }
-    }
-  };
-
-  const copyToClipboard = async () => {
-    if (typeof window !== "undefined") {
-      try {
-        await navigator.clipboard.writeText(peerId);
-        messageApi.success("copied!");
-      } catch {
-        messageApi.error("falied");
       }
     }
   };
@@ -157,57 +164,71 @@ function DynamicConnect() {
     initialize();
   }, []);
 
+  const toggleVideo = () => {
+    videoStream.getVideoTracks()[0].enabled =
+      !videoStream.getVideoTracks()[0].enabled;
+    setVideo((video) => !video);
+  };
+
+  const toggleAudio = () => {
+    videoStream.getAudioTracks()[0].enabled =
+      !videoStream.getAudioTracks()[0].enabled;
+    setAudio((audio) => !audio);
+  };
+
+  const endCall = () => {
+    if (call) {
+      call.close();
+      router.push("/");
+    }
+  };
+
   return (
     <ConfigProvider theme={theme}>
       <Template>
         {contextHolder}
-        {/* <CustomHeader items={navItemsHidden} keys={[1]} /> */}
         <div className="text-center">
-          <Title className="p-2">{`Listening!`}</Title>
-          <div className="flex flex-nowrap justify-center items-center p-5">
-            <Title level={5} className="p-2" style={{ margin: 0 }} id="peerId">
-              {peerId ? peerId : "loading"}
-            </Title>
-            <Tooltip title="copy to clipboard">
-              <Button
-                size="medium"
-                shape="circle"
-                icon={<CopyFilled />}
-                onClick={copyToClipboard}
-              />
-            </Tooltip>
-          </div>
+          <Title className="p-1">
+            {call ? `Connected 🥳` : "Connecting 😴"}
+          </Title>
         </div>
-
         <Row justify="space-around">
-          <Col span={11}>
-            <Card style={{ padding: 0 }}>
-              <video id="userStream" className="w-full" />
-            </Card>
+          <Col sm={23} md={23} lg={11}>
+            <div className="shadow-none rounded-md">
+              <video id="userStream" className="w-full h-full rounded-md" />
+            </div>
           </Col>
-          <Col span={11}>
-            <Card style={{ padding: 0 }}>
-              <video id="remoteStream" className="w-full" />
-            </Card>
+
+          <Col
+            sm={23}
+            md={23}
+            lg={11}
+            className={remoteStream ? "block" : "hidden"}
+          >
+            <div className="shadow-none rounded-md">
+              <video muted id="remoteStream" className="w-full" />
+            </div>
           </Col>
         </Row>
         <Row justify="center">
-          <Col span={6} className="p-5">
+          <Col span={24} className="p-5">
             <Flex wrap="nowrap" gap="large" justify="center">
-              <Tooltip title="mute">
+              <Tooltip title={!audio ? "mute" : "unmute"}>
                 <Button
                   type="primary"
                   shape="circle"
-                  icon={<AudioOutlined />}
+                  icon={!audio ? <AudioOutlined /> : <AudioMutedOutlined />}
                   size="large"
+                  onClick={toggleAudio}
                 />
               </Tooltip>
-              <Tooltip title="pause camera">
+              <Tooltip title={!video ? "pause camera" : "resume"}>
                 <Button
                   size="large"
                   shape="circle"
                   type="primary"
-                  icon={<CameraOutlined />}
+                  icon={!video ? <CameraOutlined /> : <CloseOutlined />}
+                  onClick={toggleVideo}
                 />
               </Tooltip>
 
@@ -218,6 +239,7 @@ function DynamicConnect() {
                   type="primary"
                   danger
                   icon={<PoweroffOutlined />}
+                  onClick={endCall}
                 />
               </Tooltip>
             </Flex>
